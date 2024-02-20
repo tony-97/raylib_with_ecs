@@ -8,7 +8,9 @@ BUILD_NAME := build$(addprefix _,$(call to_lower,$(TARGET)))
 BUILD_DIR  := $(BUILD_NAME)
 
 ifndef MSVC
-    CFLAGS += -I ./external/raylib/src/ -flto
+    CPPFLAGS += -I ./external/raylib/src/ -I ./external/oop-ecs/src -I ./external/oop-ecs/external/
+	CXXFLAGS += -std=c++20
+    RELEASE_FLAGS += -flto
     LDFLAGS += -L ./libs/raylib/$(BUILD_NAME)/release -flto
     LDLIBS += -lraylib
 endif
@@ -62,7 +64,7 @@ endif
 endif
 ifeq ($(TARGET),LINUX)
     LDLIBS   += 
-    LDFLAGS  += 
+    LDFLAGS  += -ltbb
     DEBUG_FLAGS   += -g -ggdb -O0
     RELEASE_FLAGS += -march=native -Ofast -s -DNDEBUG
     WFLAGS   += 

@@ -1,3 +1,4 @@
+#include <ecs_manager.hpp>
 #include <raylib.h>
 
 auto
