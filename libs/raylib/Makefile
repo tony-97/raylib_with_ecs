@@ -15,7 +15,7 @@ RAYLIB_API_VERSION = 500
 ifndef MSVC
     DEBUG_FLAGS += -g -D_DEBUG
     WFLAGS += -Wall -Wno-missing-braces -Werror=pointer-arith -Werror=implicit-function-declaration
-	CFLAGS += -D_GNU_SOURCE -D$(PLATFORM) -D$(GRAPHICS) -fno-strict-aliasing $(CUSTOM_CFLAGS) -fPIC -flto
+    CFLAGS += -D_GNU_SOURCE -D$(PLATFORM) -D$(GRAPHICS) -fno-strict-aliasing $(CUSTOM_CFLAGS) -fPIC -flto
 endif
 
 # Compilation flags
