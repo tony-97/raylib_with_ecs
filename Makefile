@@ -9,10 +9,15 @@ BUILD_DIR  := $(BUILD_NAME)
 
 ifndef MSVC
     CPPFLAGS += -I ./external/raylib/src/ -I ./external/oop-ecs/src -I ./external/oop-ecs/external/
-	CXXFLAGS += -std=c++20
+    CXXFLAGS += -std=c++20
     RELEASE_FLAGS += -flto
     LDFLAGS += -L ./libs/raylib/$(BUILD_NAME)/release -flto
     LDLIBS += -lraylib
+else
+    CPPFLAGS += /I \./external/raylib/src /I \./external/oop-ecs/src /I \./external/oop-ecs/external/
+    CXXFLAGS += /std:c++20
+	LDFLAGS += /LIBPATH: ./libs/raylib/$(BUILD_NAME)/release
+    LDLIBS += raylib.lib Shell32.lib user32.lib opengl32.lib gdi32.lib winmm.lib
 endif
 
 # Compilation flags
