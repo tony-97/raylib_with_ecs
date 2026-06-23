@@ -3,15 +3,32 @@ include Makefile.vars
 EXEC_NAME := app
 LIB_NAME  := mylib
 SRC_DIR   := src
-ARFLAGS   := rcs
-BUILD_NAME := build$(addprefix _,$(call to_lower,$(TARGET)))
-BUILD_DIR  := $(BUILD_NAME)
 
 ifndef MSVC
     CFLAGS += -I ./external/raylib/src/ -flto
     LDFLAGS += -L ./libs/raylib/$(BUILD_NAME)/release -flto
     LDLIBS += -lraylib
 endif
+
+make_libs := $(wildcard libs/*)
+LIBS_PATH += $(addsuffix /$(BUILD_NAME),$(make_libs))
+
+INCLUDE_DIRS += ./external/raylib/src/
+LIBS_PATH    += ./libs/raylib/build/build_windows/libraylib.a ./libs/raylib/build_windows/debug
+DEFINES += PLATFORM_DESKTOP
+
+
+
+define compile_lib:
+$(1):
+    $(MAKE) -c $(1)
+endef
+
+print:
+    $(info $(make_libs))
+
+
+$(foreach lib_dir,$(make_libs),$(eval $(call compile_lib,$(lib_dir))))
 
 # Compilation flags
 ifeq ($(TARGET),WEB)
@@ -30,7 +47,7 @@ endif
 ifeq ($(TARGET),ANDROID)
 	ANDROID_ARCH ?= arm64
 	ANDROID_API_VERSION ?= 29
-    LDLIBS   += 
+    LDLIBS   +=
     LDFLAGS  += 
     DEBUG_FLAGS   += 
     RELEASE_FLAGS += 
@@ -41,13 +58,13 @@ ifeq ($(TARGET),ANDROID)
 endif
 ifeq ($(TARGET),WINDOWS)
 ifdef MSVC
-    LDLIBS   += 
+    LDLIBS   +=  /L:libraylib.a libraylib.a Shell32.lib user32.lib opengl32.lib gdi32.lib winmm.lib
     LDFLAGS  += 
     DEBUG_FLAGS   += 
     RELEASE_FLAGS += 
     WFLAGS   += 
     CPPFLAGS += 
-    CXXFLAGS += 
+    CXXFLAGS += /std:c++latest
     CFLAGS   += 
 else
     LDLIBS   += 

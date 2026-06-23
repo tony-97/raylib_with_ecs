@@ -4,11 +4,10 @@ include Makefile.vars
 
 SRC_DIR := ../../external/raylib/src
 EXCLUDE_SRCS := $(wildcard $(SRC_DIR)/external/glfw/src/*.c) $(wildcard $(SRC_DIR)/external/*.c) $(wildcard $(SRC_DIR)/platforms/*.c)
-ARFLAGS := rcs
-EXEC_NAME := app
 LIB_NAME := raylib
-BUILD_NAME := build$(addprefix _,$(call to_lower,$(TARGET)))
-BUILD_DIR ?= $(BUILD_NAME)
+
+INCLUDE_DIRS += ../../external/raylib/src/external/glfw/include
+DEFINES += PLATFORM_DESKTOP
 
 RAYLIB_API_VERSION = 500
 
