@@ -23,7 +23,8 @@ EXCLUDE_SRCS := $(wildcard $(SRC_DIR)/external/glfw/src/*.c) \
 
 DEFINES += $(BACKEND) $(GRAPHICS)
 
-RAYLIB_API_VERSION = 500
+RAYLIB_VERSION     := 6.0.0
+RAYLIB_API_VERSION := 600
 
 #==============================================================================
 # Common flags (non-MSVC)
@@ -34,15 +35,11 @@ ifndef MSVC
     DEFINES += _GNU_SOURCE
     CFLAGS  += -std=c99 -fno-strict-aliasing $(CUSTOM_CFLAGS) -fPIC -flto
     WFLAGS  += -Wall -Wno-missing-braces -Wno-unused-parameter -Wno-c11-extensions -Wno-shadow -Werror=pointer-arith -Werror=implicit-function-declaration
-    LDLIBS  += -lm -latomic
+    LDLIBS  += -lc -lm -latomic
 endif
 
 ifeq ($(TARGET),WEB)
     BACKEND = PLATFORM_WEB
-endif
-
-ifeq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_WEB,$(BACKEND)),)
-    INCLUDE_DIRS += $(SRC_DIR)/external/glfw/include
 endif
 
 # Configure backend flags
@@ -90,6 +87,10 @@ ifneq ($(filter LINUX WINDOWS OSX,$(TARGET)),)
     endif
 endif
 
+ifeq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_WEB,$(BACKEND)),)
+    INCLUDE_DIRS += $(SRC_DIR)/external/glfw/include
+endif
+
 # Common graphics system flags
 ifneq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_DESKTOP_SDL PLATFORM_DESKTOP_RGFW,$(BACKEND)),)
     ifeq ($(TARGET),WINDOWS)
@@ -117,11 +118,14 @@ ifneq ($(filter ANDROID WEB DRM,$(TARGET)),)
     GRAPHICS := GRAPHICS_API_OPENGL_ES2
 endif
 
+ifneq ($(BACKEND),PLATFORM_DESKTOP_GLFW)
+    EXCLUDE_SRCS += $(SRC_DIR)/rglfw.c
+endif
+
 #==============================================================================
 # Per-target flags
 #==============================================================================
 ifeq ($(TARGET),WEB)
-    EXCLUDE_SRCS += $(SRC_DIR)/rglfw.c
     LDFLAGS  += -sUSE_GLFW=3
     WFLAGS   += -Wno-unused-command-line-argument
     CFLAGS   = -std=gnu99 -fno-strict-aliasing
@@ -131,8 +135,9 @@ endif
 ifeq ($(TARGET),ANDROID)
 	ANDROID_ARCH ?= arm64
 	ANDROID_API_VERSION ?= 29
-    LDLIBS   +=
-    LDFLAGS  +=
+    BACKEND  := PLATFORM_ANDROID
+    LDLIBS   += -llog -landroid -lEGL -lGLESv2 -lOpenSLES
+    LDFLAGS  += -Wl,-soname,libraylib.$(RAYLIB_API_VERSION).so -Wl,--exclude-libs,libatomic.a -L$(SRC_DIR)
     DEBUG_FLAGS   +=
     RELEASE_FLAGS +=
     WFLAGS   +=
