@@ -4,7 +4,7 @@ auto
 main() -> int
 {
   InitWindow(640, 480, "Window");
-  SetTargetFPS(60);
+  SetTargetFPS(60000);
   while (not WindowShouldClose()) {
     BeginDrawing();
     ClearBackground(RAYWHITE);

@@ -4,9 +4,9 @@
 # This Makefile is invoked by the root Makefile via:
 #     $(MAKE) -C libs/raylib lib
 #
-# It reuses the generic build system (Makefile.vars → Makefile.options →
-# Makefile.rules) through symlinks.  All shared variables (CC, CXX, AR,
-# TARGET, BUILD_MODE, etc.) are inherited from the parent make.
+# It reuses the generic build system (Makefile.vars → Makefile.rules) through
+# symlinks.  All shared variables (CC, CXX, AR, TARGET, BUILD_MODE, etc.)
+# are inherited from the parent make.
 #==============================================================================
 
 include Makefile.vars
@@ -14,14 +14,14 @@ include Makefile.vars
 #==============================================================================
 # Source layout
 #==============================================================================
+LIB_NAME     := raylib
+
 SRC_DIR      := ../../external/raylib/src
 EXCLUDE_SRCS := $(wildcard $(SRC_DIR)/external/glfw/src/*.c) \
                 $(wildcard $(SRC_DIR)/external/*.c) \
                 $(wildcard $(SRC_DIR)/platforms/*.c)
-LIB_NAME     := raylib
 
-INCLUDE_DIRS += ../../external/raylib/src/external/glfw/include
-DEFINES      += PLATFORM_DESKTOP
+DEFINES += $(BACKEND) $(GRAPHICS)
 
 RAYLIB_API_VERSION = 500
 
@@ -29,120 +29,161 @@ RAYLIB_API_VERSION = 500
 # Common flags (non-MSVC)
 #==============================================================================
 ifndef MSVC
-    DEBUG_FLAGS += -g -D_DEBUG
-    WFLAGS     += -Wall -Wno-missing-braces -Werror=pointer-arith \
-                  -Werror=implicit-function-declaration
-    CFLAGS     += -D_GNU_SOURCE -D$(PLATFORM) -D$(GRAPHICS) \
-                  -fno-strict-aliasing $(CUSTOM_CFLAGS) -fPIC -flto
+    DEBUG_FLAGS   += -g -ggdb -O0 -D_DEBUG
+    RELEASE_FLAGS += -Ofast -DNDEBUG
+    DEFINES += _GNU_SOURCE
+    CFLAGS  += -std=c99 -fno-strict-aliasing $(CUSTOM_CFLAGS) -fPIC -flto
+    WFLAGS  += -Wall -Wno-missing-braces -Wno-unused-parameter -Wno-c11-extensions -Wno-shadow -Werror=pointer-arith -Werror=implicit-function-declaration
+    LDLIBS  += -lm -latomic
+endif
+
+ifeq ($(TARGET),WEB)
+    BACKEND = PLATFORM_WEB
+endif
+
+ifeq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_WEB,$(BACKEND)),)
+    INCLUDE_DIRS += $(SRC_DIR)/external/glfw/include
+endif
+
+# Configure backend flags
+ifneq ($(filter LINUX WINDOWS OSX,$(TARGET)),)
+    GRAPHICS := GRAPHICS_API_OPENGL_33
+
+    BACKEND ?= PLATFORM_DESKTOP_GLFW
+    ifeq ($(BACKEND),PLATFORM_DESKTOP_GLFW)
+        ifeq ($(TARGET),LINUX)
+            ifdef WAYLAND
+                CFLAGS += -D_GLFW_WAYLAND
+                LDFLAGS += $(shell pkg-config wayland-client wayland-cursor wayland-egl xkbcommon --libs)
+
+                WL_PROTOCOLS_DIR := external/glfw/deps/wayland
+
+                wl_generate = \
+                    $(eval protocol=$(1)) \
+                    $(eval basename=$(2)) \
+                    $(shell wayland-scanner client-header $(protocol) $(RAYLIB_SRC_PATH)/$(basename).h) \
+                    $(shell wayland-scanner private-code $(protocol) $(RAYLIB_SRC_PATH)/$(basename)-code.h)
+
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/wayland.xml, wayland-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/xdg-shell.xml, xdg-shell-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/xdg-decoration-unstable-v1.xml, xdg-decoration-unstable-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/viewporter.xml, viewporter-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/relative-pointer-unstable-v1.xml, relative-pointer-unstable-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/pointer-constraints-unstable-v1.xml, pointer-constraints-unstable-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/fractional-scale-v1.xml, fractional-scale-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/xdg-activation-v1.xml, xdg-activation-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/idle-inhibit-unstable-v1.xml, idle-inhibit-unstable-v1-client-protocol)
+            endif
+        endif
+    endif
+
+    ifeq ($(BACKEND),PLATFORM_DESKTOP_SDL)
+        LDLIBS += $(SDL_LIBRARIES)
+    endif
+
+    ifeq ($(BACKEND),PLATFORM_DESKTOP_RGFW)
+        ifeq ($(TARGET),LINUX)
+            # Libraries for Debian GNU/Linux desktop compipling
+            # NOTE: Required packages: libegl1-mesa-dev
+            LDLIBS += -lX11 -lXrandr -lXinerama -lXi -lXcursor
+        endif
+    endif
+endif
+
+# Common graphics system flags
+ifneq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_DESKTOP_SDL PLATFORM_DESKTOP_RGFW,$(BACKEND)),)
+    ifeq ($(TARGET),WINDOWS)
+        # Libraries for Windows desktop compilation
+        LDLIBS += -static-libgcc -lopengl32 -lgdi32 -lwinmm
+    endif
+    ifeq ($(TARGET),LINUX)
+        # Libraries for Debian GNU/Linux desktop compipling
+        # NOTE: Required packages: libegl1-mesa-dev
+        LDLIBS += -lGL -lpthread -ldl -lrt
+
+        ifdef X11
+            DEFINES += _GLFW_X11
+            LDLIBS  += -lX11
+        endif
+    endif
+    ifeq ($(TARGET),OSX)
+        # Libraries for Debian MacOS desktop compiling
+        # NOTE: Required packages: libegl1-mesa-dev
+        LDLIBS += -framework Cocoa -framework OpenGL -framework CoreVideo -framework IOKit -framework CoreAudio
+    endif
+endif
+
+ifneq ($(filter ANDROID WEB DRM,$(TARGET)),)
+    GRAPHICS := GRAPHICS_API_OPENGL_ES2
 endif
 
 #==============================================================================
 # Per-target flags
 #==============================================================================
 ifeq ($(TARGET),WEB)
-    PLATFORM := PLATFORM_WEB
-    GRAPHICS := GRAPHICS_API_OPENGL_ES2
     EXCLUDE_SRCS += $(SRC_DIR)/rglfw.c
-    LDFLAGS       += -Wl,-soname,lib$(LIB_NAME).so.$(RAYLIB_API_VERSION) -Oz -flto
-    DEBUG_FLAGS   += -O0 -sASSERTIONS=1 --profiling
-    RELEASE_FLAGS += -O3 -flto
-    WFLAGS        += -Wno-unused-command-line-argument
-    CFLAGS        += -std=gnu99 -flto --closure 2 -sMODULARIZE
+    LDFLAGS  += -sUSE_GLFW=3
+    WFLAGS   += -Wno-unused-command-line-argument
+    CFLAGS   = -std=gnu99 -fno-strict-aliasing
+    DEBUG_FLAGS   = -O0 -sASSERTIONS=1 --profiling
+    RELEASE_FLAGS = -Oz --closure 2 -sMODULARIZE -flto
 endif
 ifeq ($(TARGET),ANDROID)
 	ANDROID_ARCH ?= arm64
 	ANDROID_API_VERSION ?= 29
-    LDLIBS   += 
-    LDFLAGS  += 
-    DEBUG_FLAGS   += 
-    RELEASE_FLAGS += 
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
+    LDLIBS   +=
+    LDFLAGS  +=
+    DEBUG_FLAGS   +=
+    RELEASE_FLAGS +=
+    WFLAGS   +=
+    CPPFLAGS +=
+    CXXFLAGS +=
+    CFLAGS   +=
 endif
 ifeq ($(TARGET),WINDOWS)
 ifdef MSVC
-    LDLIBS   += 
-    LDFLAGS  += 
     DEBUG_FLAGS   += /Od
     RELEASE_FLAGS += /O2yit
     WFLAGS   += /wd4668 /wd4820 /wd4061 /wd5045 /wd4711 /wd4710 /wd4191 /wd4100 /wd4244 /wd4996 /wd4996
-    CPPFLAGS += 
-    CXXFLAGS += 
     CFLAGS   += /std:c11 /nologo
 else
-    PLATFORM      := PLATFORM_DESKTOP
-    GRAPHICS      := GRAPHICS_API_OPENGL_33
-    LDLIBS        += -lopengl32 -lgdi32 -lwinmm -lshell32
-    LDFLAGS       += -Wl,--out-implib,$(BUILD_PATH)/$(LIB_NAME)dll.a
-    DEBUG_FLAGS   += -g -ggdb -O0
-    RELEASE_FLAGS += -march=native -Ofast -s -DNDEBUG
-    CPPFLAGS      += -I$(SRC_DIR)/external/glfw/include \
-                     -I$(SRC_DIR)/external/glfw/deps/mingw
-    CFLAGS        += -std=c99
+    LDLIBS   += -lshell32
+    LDFLAGS  +=
+    CPPFLAGS += -I$(SRC_DIR)/external/glfw/include -I$(SRC_DIR)/external/glfw/deps/mingw
 endif
 endif
 ifeq ($(TARGET),LINUX)
-    PLATFORM      := PLATFORM_DESKTOP
-    GRAPHICS      := GRAPHICS_API_OPENGL_33
-    LDLIBS        += -lGL -lc -lm -lpthread -ldl -lrt -lX11
-    LDFLAGS       += -Wl,-soname,lib$(LIB_NAME).so.$(RAYLIB_API_VERSION)
-    DEBUG_FLAGS   += -g -ggdb -O0
-    RELEASE_FLAGS += -march=native -Ofast -s -DNDEBUG
-    CPPFLAGS      += -I$(SRC_DIR)/external/glfw/include \
-                     -I$(SRC_DIR)/external/glfw/deps/mingw
-    CFLAGS        += -std=c99
+    LDFLAGS  +=
 endif
 ifeq ($(TARGET),OSX)
-    LDLIBS   += 
-    LDFLAGS  += 
-    DEBUG_FLAGS   += 
-    RELEASE_FLAGS += 
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
+    LDLIBS   +=
+    LDFLAGS  +=
+    DEBUG_FLAGS   +=
+    RELEASE_FLAGS +=
+    WFLAGS   +=
+    CPPFLAGS +=
+    CXXFLAGS +=
+    CFLAGS   +=
 endif
 # Add more targets
-
-ifeq ($(SDL),1)
-    ifndef MSVC
-        PLATFORM := PLATFORM_DESKTOP_SDL
-        GRAPHICS := GRAPHICS_API_OPENGL_33
-        LDLIBS   += -lGL -lc -lm -lpthread -ldl -lrt
-        BUILD_DIR := $(BUILD_NAME)_sdl
-        CPPFLAGS += -I /usr/include/SDL2
-        CFLAGS   += -std=gnu99
-    endif
-endif
 
 export
 
 #==============================================================================
 # Targets — delegate to the generic build system
 #==============================================================================
-.PHONY: all lib run run_valgrind run_cgdb info clean cleanall
+.PHONY: all lib info clean cleanall
 
 all: lib
 
 lib:
-	$(MAKE) -f Makefile.options lib
-
-run:
-	$(MAKE) -f Makefile.options run
-
-run_valgrind:
-	$(MAKE) -f Makefile.options run_valgrind
-
-run_cgdb:
-	$(MAKE) -f Makefile.options run_cgdb
+	$(MAKE) -f Makefile.rules lib
 
 info:
-	$(MAKE) -f Makefile.options info
+	$(MAKE) -f Makefile.rules info
 
 clean:
-	$(MAKE) -f Makefile.options clean
+	$(MAKE) -f Makefile.rules clean
 
 cleanall:
-	$(MAKE) -f Makefile.options cleanall
+	$(MAKE) -f Makefile.rules cleanall

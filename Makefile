@@ -1,19 +1,9 @@
 include Makefile.vars
-
+#TODO HANDLE CPP AND C STANDARD SEPARATLY AND THEM MERGE ON CFLAGS AN CXXFLAGS
 EXEC_NAME := app
 LIB_NAME  := mylib
 SRC_DIR   := src
-
-#==============================================================================
-# Build mode name (debug/release)
-# Mirrors the logic in Makefile.options so that lib_config.mk files can
-# resolve the correct library output path at include time.
-#==============================================================================
-ifeq ($(BUILD_MODE),RELEASE)
-    BUILD_MODE_NAME := release
-else
-    BUILD_MODE_NAME := debug
-endif
+EXEC_EXTENSION := .html
 
 #==============================================================================
 # External Libraries — auto-discovered from libs/
@@ -29,10 +19,10 @@ include $(LIB_CONFIGS)
 endif
 
 # Generically add every library's output directory to the linker search path.
-# Each lib builds into: libs/<name>/<BUILD_NAME>/<BUILD_MODE_NAME>/
-#   BUILD_NAME      = build_windows | build_linux | ...  (from Makefile.vars)
-#   BUILD_MODE_NAME = debug | release                    (computed above)
-LIBS_PATH += $(addsuffix /$(BUILD_NAME)/$(BUILD_MODE_NAME),$(LIB_DIRS))
+# Each lib builds into: libs/<name>/<BUILD_DIR>/<BUILD_MODE_NAME>/
+#   BUILD_DIR       = build_windows | build_linux | ...  (from Makefile.vars)
+#   BUILD_MODE_NAME = debug | release                    (from Makefile.vars)
+LIBS_PATH += $(addsuffix /$(BUILD_DIR)/$(BUILD_MODE_NAME),$(LIB_DIRS))
 
 ifndef MSVC
     CFLAGS  += -flto
@@ -67,7 +57,7 @@ ifeq ($(TARGET),ANDROID)
 endif
 ifeq ($(TARGET),WINDOWS)
 ifdef MSVC
-    LDLIBS   +=  /L:libraylib.a libraylib.a Shell32.lib user32.lib opengl32.lib gdi32.lib winmm.lib
+    LDLIBS   +=
     LDFLAGS  += 
     DEBUG_FLAGS   += 
     RELEASE_FLAGS += 
@@ -124,21 +114,21 @@ export
 define LIB_BUILD_TEMPLATE
 .PHONY: build-lib-$(notdir $(1))
 build-lib-$(notdir $(1)):
-	$$(MAKE) -C $(1) lib
+	@$$(MAKE) -C $(1) lib
 endef
 
 define LIB_CLEAN_TEMPLATE
 .PHONY: clean-lib-$(notdir $(1)) cleanall-lib-$(notdir $(1))
 clean-lib-$(notdir $(1)):
-	$$(MAKE) -C $(1) clean
+	@$$(MAKE) -C $(1) clean
 cleanall-lib-$(notdir $(1)):
-	$$(MAKE) -C $(1) cleanall
+	@$$(MAKE) -C $(1) cleanall
 endef
 
 .PHONY: all lib run run_valgrind run_cgdb info clean cleanall build-libs clean-libs cleanall-libs
 
 all: build-libs
-	$(MAKE) -f Makefile.options all
+	@$(MAKE) -f Makefile.rules all
 
 $(foreach lib,$(LIB_DIRS),$(eval $(call LIB_BUILD_TEMPLATE,$(lib))))
 $(foreach lib,$(LIB_DIRS),$(eval $(call LIB_CLEAN_TEMPLATE,$(lib))))
@@ -148,26 +138,25 @@ clean-libs: $(foreach lib,$(LIB_DIRS),clean-lib-$(notdir $(lib)))
 cleanall-libs: $(foreach lib,$(LIB_DIRS),cleanall-lib-$(notdir $(lib)))
 
 lib:
-	$(MAKE) -f Makefile.options lib
+	@$(MAKE) -f Makefile.rules lib
 
 run:
-	$(MAKE) -f Makefile.options run
+	@$(MAKE) -f Makefile.rules run
 
 run_valgrind:
-	$(MAKE) -f Makefile.options run_valgrind
+	@$(MAKE) -f Makefile.rules run_valgrind
 
 run_cgdb:
-	$(MAKE) -f Makefile.options run_cgdb
+	@$(MAKE) -f Makefile.rules run_cgdb
 
 info:
 	$(info [INFO] LIB_DIRS       : $(LIB_DIRS))
 	$(info [INFO] LIB_CONFIGS    : $(LIB_CONFIGS))
-	$(info [INFO] BUILD_MODE_NAME: $(BUILD_MODE_NAME))
 	$(info [INFO] LIBS_PATH      : $(LIBS_PATH))
-	$(MAKE) -f Makefile.options info
+	@$(MAKE) -f Makefile.rules info
 
 clean: clean-libs
-	$(MAKE) -f Makefile.options clean
+	@$(MAKE) -f Makefile.rules clean
 
 cleanall: cleanall-libs
-	$(MAKE) -f Makefile.options cleanall
+	@$(MAKE) -f Makefile.rules cleanall
