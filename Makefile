@@ -8,13 +8,12 @@ SRC_DIR   := src
 # External Libraries — auto-discovered from libs/
 #==============================================================================
 # Only consider directories that contain a Makefile (i.e. buildable libraries)
-LIB_DIRS    := $(foreach d,$(wildcard libs/*),$(if $(wildcard $(d)/Makefile),$(d)))
-LIB_CONFIGS := $(wildcard libs/*/lib_config.mk)
+LIB_DIRS := $(foreach d,$(wildcard libs/*),$(if $(wildcard $(d)/Makefile),$(d)))
 
-# Include each library's consumer configuration.
-# These files append to INCLUDE_DIRS, LDLIBS, DEFINES, etc.
-ifneq ($(LIB_CONFIGS),)
-include $(LIB_CONFIGS)
+# Include each library's Makefile for consumer configuration.
+# Build-only sections and targets are auto-guarded via MAKEFILE_LIST.
+ifneq ($(LIB_DIRS),)
+include $(foreach d,$(LIB_DIRS),$(d)/Makefile)
 endif
 
 # Generically add every library's output directory to the linker search path.
@@ -116,15 +115,15 @@ export
 define LIB_BUILD_TEMPLATE
 .PHONY: build-lib-$(notdir $(1))
 build-lib-$(notdir $(1)):
-	@$$(MAKE) -C $(1) lib
+	@$$(MAKE) -f $(1)/Makefile BUILD_DIR=$(1)/$$(BUILD_DIR) lib
 endef
 
 define LIB_CLEAN_TEMPLATE
 .PHONY: clean-lib-$(notdir $(1)) cleanall-lib-$(notdir $(1))
 clean-lib-$(notdir $(1)):
-	@$$(MAKE) -C $(1) clean
+	@$$(MAKE) -f $(1)/Makefile BUILD_DIR=$(1)/$$(BUILD_DIR) clean
 cleanall-lib-$(notdir $(1)):
-	@$$(MAKE) -C $(1) cleanall
+	@$$(MAKE) -f $(1)/Makefile BUILD_DIR=$(1)/$$(BUILD_DIR) cleanall
 endef
 
 .PHONY: all lib run run_valgrind run_cgdb info clean cleanall build-libs clean-libs cleanall-libs
@@ -142,6 +141,9 @@ cleanall-libs: $(foreach lib,$(LIB_DIRS),cleanall-lib-$(notdir $(lib)))
 lib:
 	@$(MAKE) -f Makefile.rules lib
 
+androiddirs:
+	@$(MAKE) -f Makefile.rules androiddirs
+
 run:
 	@$(MAKE) -f Makefile.rules run
 
@@ -153,7 +155,6 @@ run_cgdb:
 
 info:
 	$(info [INFO] LIB_DIRS       : $(LIB_DIRS))
-	$(info [INFO] LIB_CONFIGS    : $(LIB_CONFIGS))
 	$(info [INFO] LIBS_PATH      : $(LIBS_PATH))
 	$(info [INFO] LIBS           : $(LIBS))
 	@$(MAKE) -f Makefile.rules info

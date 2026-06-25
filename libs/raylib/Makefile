@@ -1,32 +1,162 @@
 #==============================================================================
-# libs/raylib/Makefile — Build configuration for raylib as a static library
+# libs/raylib/Makefile — Raylib configuration & build
 #
-# This Makefile is invoked by the root Makefile via:
-#     $(MAKE) -C libs/raylib lib
+# This file serves TWO roles:
+#   1. CONSUMER CONFIG — when included by the root Makefile, it provides
+#      include paths, link libraries, defines, and system dependencies.
+#   2. BUILD CONFIG — when invoked directly ($(MAKE) -f libs/raylib/Makefile),
+#      it additionally sets build-only flags and delegates to Makefile.rules.
 #
-# It reuses the generic build system (Makefile.vars → Makefile.rules) through
-# symlinks.  All shared variables (CC, CXX, AR, TARGET, BUILD_MODE, etc.)
-# are inherited from the parent make.
+# The MAKEFILE_LIST trick auto-detects which role we're in:
+#   - Direct invocation: we're the first file in MAKEFILE_LIST
+#   - Included by root: root's Makefile is the first file
 #==============================================================================
 
+# Capture our filename before any includes modify MAKEFILE_LIST
+_LAST_MK := $(lastword $(MAKEFILE_LIST))
+_INCLUDED_AS_CONFIG := $(filter $(_LAST_MK),$(firstword $(MAKEFILE_LIST)))
+
+# When invoked directly, load the generic build infrastructure
+ifneq ($(_INCLUDED_AS_CONFIG),)
 include Makefile.vars
+endif
 
 #==============================================================================
-# Source layout
+# Consumer configuration (always active)
+# Root Makefile and this build both need these.
 #==============================================================================
+
+# Include path so #include <raylib.h> works
+INCLUDE_DIRS += ./external/raylib/src/
+
+# Link against the static library
+ifndef MSVC
+    LDLIBS  += -lraylib
+    CFLAGS  += -flto
+    LDFLAGS += -flto
+endif
+
+BACKEND ?= PLATFORM_DESKTOP_GLFW
+
+RAYLIB_VERSION     := 6.0.0
+RAYLIB_API_VERSION := 600
+
+#==============================================================================
+# Backend detection
+#==============================================================================
+ifeq ($(TARGET),WEB)
+    BACKEND = PLATFORM_WEB
+endif
+
+ifneq ($(filter LINUX WINDOWS OSX,$(TARGET)),)
+    GRAPHICS := GRAPHICS_API_OPENGL_33
+    BACKEND ?= PLATFORM_DESKTOP_GLFW
+endif
+
+ifneq ($(filter ANDROID WEB DRM,$(TARGET)),)
+    GRAPHICS := GRAPHICS_API_OPENGL_ES2
+endif
+
+DEFINES += $(BACKEND) $(GRAPHICS)
+
+#==============================================================================
+# System library dependencies
+#==============================================================================
+ifndef MSVC
+    LDLIBS += -lc -lm -latomic
+endif
+
+# Desktop backends — common system libs
+ifneq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_DESKTOP_SDL PLATFORM_DESKTOP_RGFW,$(BACKEND)),)
+    ifeq ($(TARGET),WINDOWS)
+        LDLIBS += -static-libgcc -lopengl32 -lgdi32 -lwinmm
+    endif
+    ifeq ($(TARGET),LINUX)
+        # NOTE: Required packages: libegl1-mesa-dev
+        LDLIBS += -lGL -lpthread -ldl -lrt
+        ifdef X11
+            DEFINES += _GLFW_X11
+            LDLIBS  += -lX11
+        endif
+    endif
+    ifeq ($(TARGET),OSX)
+        LDLIBS += -framework Cocoa -framework OpenGL -framework CoreVideo -framework IOKit -framework CoreAudio
+    endif
+endif
+
+# GLFW backend — Wayland support
+ifeq ($(BACKEND),PLATFORM_DESKTOP_GLFW)
+    ifneq ($(filter LINUX WINDOWS OSX,$(TARGET)),)
+        ifeq ($(TARGET),LINUX)
+            ifdef WAYLAND
+                LDFLAGS += $(shell pkg-config wayland-client wayland-cursor wayland-egl xkbcommon --libs)
+
+                WL_PROTOCOLS_DIR := external/glfw/deps/wayland
+
+                wl_generate = \
+                    $(eval protocol=$(1)) \
+                    $(eval basename=$(2)) \
+                    $(shell wayland-scanner client-header $(protocol) $(RAYLIB_SRC_PATH)/$(basename).h) \
+                    $(shell wayland-scanner private-code $(protocol) $(RAYLIB_SRC_PATH)/$(basename)-code.h)
+
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/wayland.xml, wayland-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/xdg-shell.xml, xdg-shell-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/xdg-decoration-unstable-v1.xml, xdg-decoration-unstable-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/viewporter.xml, viewporter-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/relative-pointer-unstable-v1.xml, relative-pointer-unstable-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/pointer-constraints-unstable-v1.xml, pointer-constraints-unstable-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/fractional-scale-v1.xml, fractional-scale-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/xdg-activation-v1.xml, xdg-activation-v1-client-protocol)
+                $(call wl_generate, $(WL_PROTOCOLS_DIR)/idle-inhibit-unstable-v1.xml, idle-inhibit-unstable-v1-client-protocol)
+            endif
+        endif
+    endif
+endif
+
+# SDL backend
+ifeq ($(BACKEND),PLATFORM_DESKTOP_SDL)
+    LDLIBS += $(SDL_LIBRARIES)
+endif
+
+# RGFW backend
+ifeq ($(BACKEND),PLATFORM_DESKTOP_RGFW)
+    ifeq ($(TARGET),LINUX)
+        LDLIBS += -lX11 -lXrandr -lXinerama -lXi -lXcursor
+    endif
+endif
+
+#==============================================================================
+# Per-target link flags
+#==============================================================================
+ifeq ($(TARGET),WEB)
+    LDFLAGS += -sUSE_GLFW=3
+endif
+ifeq ($(TARGET),ANDROID)
+    ANDROID_ARCH ?= arm64
+    ANDROID_API_VERSION ?= 35
+    BACKEND  := PLATFORM_ANDROID
+    LDLIBS   += -llog -landroid -lEGL -lGLESv2 -lOpenSLES
+    LDFLAGS  += -Wl,--exclude-libs,libatomic.a
+endif
+ifeq ($(TARGET),WINDOWS)
+ifdef MSVC
+    LDLIBS += /L:libraylib.a libraylib.a Shell32.lib user32.lib opengl32.lib gdi32.lib winmm.lib
+endif
+endif
+
+#==============================================================================
+# BUILD-ONLY section — everything below only applies when building raylib,
+# not when included by the root Makefile for consumer config.
+#==============================================================================
+ifneq ($(_INCLUDED_AS_CONFIG),)
+
 LIB_NAME     := raylib
 
-SRC_DIR      := ../../external/raylib/src
+SRC_DIR      := ./external/raylib/src
 EXCLUDE_SRCS := $(wildcard $(SRC_DIR)/external/glfw/src/*.c) \
                 $(wildcard $(SRC_DIR)/external/*.c) \
                 $(wildcard $(SRC_DIR)/platforms/*.c)
 
-# Shared config: backend detection, system libs, defines, per-target link flags
-include lib_config.mk
-
-#==============================================================================
-# Build-only flags (not needed by consumers)
-#==============================================================================
 ifndef MSVC
     DEBUG_FLAGS   += -g -ggdb -O0 -D_DEBUG
     RELEASE_FLAGS += -Ofast -DNDEBUG
@@ -47,9 +177,6 @@ ifneq ($(BACKEND),PLATFORM_DESKTOP_GLFW)
     EXCLUDE_SRCS += $(SRC_DIR)/rglfw.c
 endif
 
-#==============================================================================
-# Per-target build-only flags
-#==============================================================================
 ifeq ($(TARGET),WEB)
     WFLAGS        += -Wno-unused-command-line-argument
     CFLAGS         = -std=gnu99 -fno-strict-aliasing
@@ -76,22 +203,12 @@ export
 #==============================================================================
 # Targets — delegate to the generic build system
 #==============================================================================
-.PHONY: all lib run run_cgdb info clean cleanall
+.PHONY: all lib info clean cleanall
 
-all:
-	@$(MAKE) -f Makefile.rules all
+all: lib
 
 lib:
 	@$(MAKE) -f Makefile.rules lib
-
-run:
-	@$(MAKE) -f Makefile.rules run
-
-run_valgrind:
-	@$(MAKE) -f Makefile.rules run_valgrind
-
-run_cgdb:
-	@$(MAKE) -f Makefile.rules run_cgdb
 
 info:
 	@$(MAKE) -f Makefile.rules info
@@ -101,3 +218,5 @@ clean:
 
 cleanall:
 	@$(MAKE) -f Makefile.rules cleanall
+
+endif # _INCLUDED_AS_CONFIG
