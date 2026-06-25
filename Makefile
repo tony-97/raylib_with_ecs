@@ -3,7 +3,6 @@ include Makefile.vars
 EXEC_NAME := app
 LIB_NAME  := mylib
 SRC_DIR   := src
-EXEC_EXTENSION := .html
 
 #==============================================================================
 # External Libraries — auto-discovered from libs/
@@ -22,7 +21,9 @@ endif
 # Each lib builds into: libs/<name>/<BUILD_DIR>/<BUILD_MODE_NAME>/
 #   BUILD_DIR       = build_windows | build_linux | ...  (from Makefile.vars)
 #   BUILD_MODE_NAME = debug | release                    (from Makefile.vars)
-LIBS_PATH += $(addsuffix /$(BUILD_DIR)/$(BUILD_MODE_NAME),$(LIB_DIRS))
+LIBS_BUILD_PATH = $(addsuffix /$(BUILD_DIR)/$(BUILD_MODE_NAME),$(LIB_DIRS))
+export LIBS = $(foreach DIR,$(LIBS_BUILD_PATH),$(wildcard $(DIR)/lib*))
+LIBS_PATH += $(LIBS_BUILD_PATH)
 
 ifndef MSVC
     CFLAGS  += -flto
@@ -31,6 +32,7 @@ endif
 
 # Compilation flags
 ifeq ($(TARGET),WEB)
+    EXEC_EXTENSION := .html
     AR  := emar
     CC  := emcc
     CXX := em++
@@ -45,15 +47,15 @@ ifeq ($(TARGET),WEB)
 endif
 ifeq ($(TARGET),ANDROID)
 	ANDROID_ARCH ?= arm64
-	ANDROID_API_VERSION ?= 29
+	ANDROID_API_VERSION ?= 35
     LDLIBS   +=
-    LDFLAGS  += 
-    DEBUG_FLAGS   += 
-    RELEASE_FLAGS += 
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
+    LDFLAGS  +=
+    DEBUG_FLAGS   +=
+    RELEASE_FLAGS +=
+    WFLAGS   +=
+    CPPFLAGS +=
+    CXXFLAGS +=
+    CFLAGS   +=
 endif
 ifeq ($(TARGET),WINDOWS)
 ifdef MSVC
@@ -153,6 +155,7 @@ info:
 	$(info [INFO] LIB_DIRS       : $(LIB_DIRS))
 	$(info [INFO] LIB_CONFIGS    : $(LIB_CONFIGS))
 	$(info [INFO] LIBS_PATH      : $(LIBS_PATH))
+	$(info [INFO] LIBS           : $(LIBS))
 	@$(MAKE) -f Makefile.rules info
 
 clean: clean-libs

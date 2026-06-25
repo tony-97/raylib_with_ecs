@@ -134,7 +134,7 @@ ifeq ($(TARGET),WEB)
 endif
 ifeq ($(TARGET),ANDROID)
 	ANDROID_ARCH ?= arm64
-	ANDROID_API_VERSION ?= 29
+	ANDROID_API_VERSION ?= 35
     BACKEND  := PLATFORM_ANDROID
     LDLIBS   += -llog -landroid -lEGL -lGLESv2 -lOpenSLES
     LDFLAGS  += -Wl,-soname,libraylib.$(RAYLIB_API_VERSION).so -Wl,--exclude-libs,libatomic.a -L$(SRC_DIR)

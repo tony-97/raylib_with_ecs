@@ -20,42 +20,26 @@ endif
 
 # Required defines
 BACKEND ?= PLATFORM_DESKTOP_GLFW
-DEFINES += $(BACKEND)
 
 ifndef MSVC
     CFLAGS  += -flto
     LDFLAGS += -flto
 endif
 
+DEFINES += $(BACKEND) $(GRAPHICS)
+
+RAYLIB_VERSION     := 6.0.0
+RAYLIB_API_VERSION := 600
+
+#==============================================================================
+# Common flags (non-MSVC)
+#==============================================================================
+ifndef MSVC
+    LDLIBS  += -lc -lm -latomic
+endif
+
 ifeq ($(TARGET),WEB)
     BACKEND = PLATFORM_WEB
-endif
-
-ifeq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_WEB,$(BACKEND)),)
-    INCLUDE_DIRS += $(SRC_DIR)/external/glfw/include
-endif
-
-# Common graphics system flags
-ifneq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_DESKTOP_SDL PLATFORM_DESKTOP_RGFW,$(BACKEND)),)
-    ifeq ($(TARGET),WINDOWS)
-        # Libraries for Windows desktop compilation
-        LDLIBS += -static-libgcc -lopengl32 -lgdi32 -lwinmm
-    endif
-    ifeq ($(TARGET),LINUX)
-        # Libraries for Debian GNU/Linux desktop compipling
-        # NOTE: Required packages: libegl1-mesa-dev
-        LDLIBS += -lGL -lpthread -ldl -lrt
-
-        ifdef X11
-            DEFINES += _GLFW_X11
-            LDLIBS  += -lX11
-        endif
-    endif
-    ifeq ($(TARGET),OSX)
-        # Libraries for Debian MacOS desktop compiling
-        # NOTE: Required packages: libegl1-mesa-dev
-        LDLIBS += -framework Cocoa -framework OpenGL -framework CoreVideo -framework IOKit -framework CoreAudio
-    endif
 endif
 
 # Configure backend flags
@@ -66,7 +50,6 @@ ifneq ($(filter LINUX WINDOWS OSX,$(TARGET)),)
     ifeq ($(BACKEND),PLATFORM_DESKTOP_GLFW)
         ifeq ($(TARGET),LINUX)
             ifdef WAYLAND
-                CFLAGS += -D_GLFW_WAYLAND
                 LDFLAGS += $(shell pkg-config wayland-client wayland-cursor wayland-egl xkbcommon --libs)
 
                 WL_PROTOCOLS_DIR := external/glfw/deps/wayland
@@ -103,32 +86,59 @@ ifneq ($(filter LINUX WINDOWS OSX,$(TARGET)),)
     endif
 endif
 
+# Common graphics system flags
+ifneq ($(filter PLATFORM_DESKTOP_GLFW PLATFORM_DESKTOP_SDL PLATFORM_DESKTOP_RGFW,$(BACKEND)),)
+    ifeq ($(TARGET),WINDOWS)
+        # Libraries for Windows desktop compilation
+        LDLIBS += -static-libgcc -lopengl32 -lgdi32 -lwinmm
+    endif
+    ifeq ($(TARGET),LINUX)
+        # Libraries for Debian GNU/Linux desktop compipling
+        # NOTE: Required packages: libegl1-mesa-dev
+        LDLIBS += -lGL -lpthread -ldl -lrt
+
+        ifdef X11
+            DEFINES += _GLFW_X11
+            LDLIBS  += -lX11
+        endif
+    endif
+    ifeq ($(TARGET),OSX)
+        # Libraries for Debian MacOS desktop compiling
+        # NOTE: Required packages: libegl1-mesa-dev
+        LDLIBS += -framework Cocoa -framework OpenGL -framework CoreVideo -framework IOKit -framework CoreAudio
+    endif
+endif
+
 ifneq ($(filter ANDROID WEB DRM,$(TARGET)),)
     GRAPHICS := GRAPHICS_API_OPENGL_ES2
 endif
 
-# Compilation flags
+
+#==============================================================================
+# Per-target flags
+#==============================================================================
 ifeq ($(TARGET),WEB)
-    LDLIBS  +=
-    LDFLAGS += -sUSE_GLFW=3
+    LDFLAGS  += -sUSE_GLFW=3
 endif
 ifeq ($(TARGET),ANDROID)
 	ANDROID_ARCH ?= arm64
-	ANDROID_API_VERSION ?= 29
-    LDLIBS +=
+	ANDROID_API_VERSION ?= 35
+    BACKEND  := PLATFORM_ANDROID
+    LDLIBS   += -llog -landroid -lEGL -lGLESv2 -lOpenSLES
+    LDFLAGS  += -Wl,--exclude-libs,libatomic.a
 endif
 ifeq ($(TARGET),WINDOWS)
 ifdef MSVC
-    LDLIBS +=  /L:libraylib.a libraylib.a Shell32.lib user32.lib opengl32.lib gdi32.lib winmm.lib
+    LDLIBS += /L:libraylib.a libraylib.a Shell32.lib user32.lib opengl32.lib gdi32.lib winmm.lib
 else
-    LDLIBS += 
+    LDLIBS +=
 endif
 endif
 ifeq ($(TARGET),LINUX)
-    LDLIBS += 
+    LDLIBS +=
 endif
 ifeq ($(TARGET),OSX)
-    LDLIBS += 
+    LDLIBS +=
 endif
 # Add more targets
 
