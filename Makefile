@@ -20,7 +20,7 @@ endif
 # Each lib builds into: libs/<name>/<BUILD_DIR>/<BUILD_MODE_NAME>/
 #   BUILD_DIR       = build_windows | build_linux | ...  (from Makefile.vars)
 #   BUILD_MODE_NAME = debug | release                    (from Makefile.vars)
-LIBS_BUILD_PATH = $(addsuffix /$(BUILD_DIR)/$(BUILD_MODE_NAME),$(LIB_DIRS))
+LIBS_BUILD_PATH = $(addsuffix /$(BUILD_MODE_DIR_NAME),$(LIB_DIRS))
 export LIBS = $(foreach DIR,$(LIBS_BUILD_PATH),$(wildcard $(DIR)/lib*))
 LIBS_PATH += $(LIBS_BUILD_PATH)
 
@@ -115,15 +115,21 @@ export
 define LIB_BUILD_TEMPLATE
 .PHONY: build-lib-$(notdir $(1))
 build-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_DIR=$(1)/$$(BUILD_DIR) lib
+	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) lib
 endef
 
 define LIB_CLEAN_TEMPLATE
 .PHONY: clean-lib-$(notdir $(1)) cleanall-lib-$(notdir $(1))
 clean-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_DIR=$(1)/$$(BUILD_DIR) clean
+	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) clean
 cleanall-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_DIR=$(1)/$$(BUILD_DIR) cleanall
+	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) cleanall
+endef
+
+define LIB_INFO_TEMPLATE
+.PHONY: info-lib-$(notdir $(1))
+info-lib-$(notdir $(1)):
+	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) info
 endef
 
 .PHONY: all lib run run_valgrind run_cgdb info clean cleanall build-libs clean-libs cleanall-libs
@@ -133,16 +139,15 @@ all: build-libs
 
 $(foreach lib,$(LIB_DIRS),$(eval $(call LIB_BUILD_TEMPLATE,$(lib))))
 $(foreach lib,$(LIB_DIRS),$(eval $(call LIB_CLEAN_TEMPLATE,$(lib))))
+$(foreach lib,$(LIB_DIRS),$(eval $(call LIB_INFO_TEMPLATE ,$(lib))))
 
 build-libs: $(foreach lib,$(LIB_DIRS),build-lib-$(notdir $(lib)))
 clean-libs: $(foreach lib,$(LIB_DIRS),clean-lib-$(notdir $(lib)))
 cleanall-libs: $(foreach lib,$(LIB_DIRS),cleanall-lib-$(notdir $(lib)))
+info-libs: $(foreach lib,$(LIB_DIRS),info-lib-$(notdir $(lib)))
 
 lib:
 	@$(MAKE) -f Makefile.rules lib
-
-androiddirs:
-	@$(MAKE) -f Makefile.rules androiddirs
 
 run:
 	@$(MAKE) -f Makefile.rules run
