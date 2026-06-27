@@ -1,10 +1,9 @@
-#include <ecs_manager.hpp>
 #include <raylib.h>
 
 auto
 main() -> int
 {
-  InitWindow(640, 480, "Window");
+  InitWindow(0, 0, "Window");
   SetTargetFPS(60);
   while (not WindowShouldClose()) {
     BeginDrawing();
