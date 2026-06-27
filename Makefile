@@ -4,26 +4,6 @@ EXEC_NAME := app
 LIB_NAME  := mylib
 SRC_DIR   := src
 
-#==============================================================================
-# External Libraries — auto-discovered from libs/
-#==============================================================================
-# Only consider directories that contain a Makefile (i.e. buildable libraries)
-LIB_DIRS := $(foreach d,$(wildcard libs/*),$(if $(wildcard $(d)/Makefile),$(d)))
-
-# Include each library's Makefile for consumer configuration.
-# Build-only sections and targets are auto-guarded via MAKEFILE_LIST.
-ifneq ($(LIB_DIRS),)
-include $(foreach d,$(LIB_DIRS),$(d)/Makefile)
-endif
-
-# Generically add every library's output directory to the linker search path.
-# Each lib builds into: libs/<name>/<BUILD_DIR>/<BUILD_MODE_NAME>/
-#   BUILD_DIR       = build_windows | build_linux | ...  (from Makefile.vars)
-#   BUILD_MODE_NAME = debug | release                    (from Makefile.vars)
-LIBS_BUILD_PATH = $(addsuffix /$(BUILD_MODE_DIR_NAME),$(LIB_DIRS))
-export LIBS = $(foreach DIR,$(LIBS_BUILD_PATH),$(wildcard $(DIR)/lib*))
-LIBS_PATH += $(LIBS_BUILD_PATH)
-
 ifndef MSVC
     CFLAGS  += -flto
     LDFLAGS += -flto
@@ -101,50 +81,10 @@ endif
 
 export
 
-#==============================================================================
-# Per-library build / clean targets (auto-generated from LIB_DIRS)
-#
-# For each libs/<name>/ directory with a Makefile, this generates:
-#   build-lib-<name>   — builds the library via $(MAKE) -C libs/<name> lib
-#   clean-lib-<name>   — cleans the library
-#   cleanall-lib-<name> — deep-cleans the library
-#
-# These individual targets are then collected into:
-#   build-libs, clean-libs, cleanall-libs
-#==============================================================================
-define LIB_BUILD_TEMPLATE
-.PHONY: build-lib-$(notdir $(1))
-build-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) lib
-endef
+.PHONY: all lib run run_valgrind run_cgdb info clean cleanall
 
-define LIB_CLEAN_TEMPLATE
-.PHONY: clean-lib-$(notdir $(1)) cleanall-lib-$(notdir $(1))
-clean-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) clean
-cleanall-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) cleanall
-endef
-
-define LIB_INFO_TEMPLATE
-.PHONY: info-lib-$(notdir $(1))
-info-lib-$(notdir $(1)):
-	@$$(MAKE) -f $(1)/Makefile BUILD_PATH=$(1)/$$(BUILD_PATH) info
-endef
-
-.PHONY: all lib run run_valgrind run_cgdb info clean cleanall build-libs clean-libs cleanall-libs
-
-all: build-libs
+all:
 	@$(MAKE) -f Makefile.rules all
-
-$(foreach lib,$(LIB_DIRS),$(eval $(call LIB_BUILD_TEMPLATE,$(lib))))
-$(foreach lib,$(LIB_DIRS),$(eval $(call LIB_CLEAN_TEMPLATE,$(lib))))
-$(foreach lib,$(LIB_DIRS),$(eval $(call LIB_INFO_TEMPLATE ,$(lib))))
-
-build-libs: $(foreach lib,$(LIB_DIRS),build-lib-$(notdir $(lib)))
-clean-libs: $(foreach lib,$(LIB_DIRS),clean-lib-$(notdir $(lib)))
-cleanall-libs: $(foreach lib,$(LIB_DIRS),cleanall-lib-$(notdir $(lib)))
-info-libs: $(foreach lib,$(LIB_DIRS),info-lib-$(notdir $(lib)))
 
 lib:
 	@$(MAKE) -f Makefile.rules lib
@@ -158,14 +98,26 @@ run_valgrind:
 run_cgdb:
 	@$(MAKE) -f Makefile.rules run_cgdb
 
+build-libs:
+	@$(MAKE) -f Makefile.rules build-libs
+
+info-libs:
+	@$(MAKE) -f Makefile.rules info-libs
+
 info:
-	$(info [INFO] LIB_DIRS       : $(LIB_DIRS))
-	$(info [INFO] LIBS_PATH      : $(LIBS_PATH))
-	$(info [INFO] LIBS           : $(LIBS))
 	@$(MAKE) -f Makefile.rules info
 
-clean: clean-libs
+info-libs:
+	@$(MAKE) -f Makefile.rules info-libs
+
+clean:
 	@$(MAKE) -f Makefile.rules clean
 
-cleanall: cleanall-libs
+cleanall:
 	@$(MAKE) -f Makefile.rules cleanall
+
+clean-libs:
+	@$(MAKE) -f Makefile.rules clean-libs
+
+cleanall-libs:
+	@$(MAKE) -f Makefile.rules cleanall-libs
