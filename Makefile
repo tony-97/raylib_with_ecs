@@ -144,29 +144,21 @@ endif
 
 export
 
-.PHONY: all lib lib run run_valgrind run_cgdb info clean cleanall build-libs clean-libs cleanall-libs info-libs
+.PHONY: all lib run run_valgrind run_cgdb info clean cleanall build-libs clean-libs cleanall-libs info-libs
 
 all:
-	@$(MAKE) -f Makefile.rules all
 	@$(MAKE) -f Makefile.rules all
 
 lib:
 	@$(MAKE) -f Makefile.rules lib
-	@$(MAKE) -f Makefile.rules lib
 
 run:
-	@$(MAKE) -f Makefile.rules run
 	@$(MAKE) -f Makefile.rules run
 
 run_valgrind:
 	@$(MAKE) -f Makefile.rules run_valgrind
-	@$(MAKE) -f Makefile.rules run_valgrind
 
 run_cgdb:
-	@$(MAKE) -f Makefile.rules run_cgdb
-
-build-libs:
-	@$(MAKE) -f Makefile.rules build-libs
 	@$(MAKE) -f Makefile.rules run_cgdb
 
 build-libs:
@@ -178,26 +170,12 @@ info-libs:
 info:
 	@$(MAKE) -f Makefile.rules info
 
-info-libs:
-	@$(MAKE) -f Makefile.rules info-libs
-	@$(MAKE) -f Makefile.rules info
-
-info-libs:
-	@$(MAKE) -f Makefile.rules info-libs
-
 clean:
-	@$(MAKE) -f Makefile.rules clean
 	@$(MAKE) -f Makefile.rules clean
 
 cleanall:
 	@$(MAKE) -f Makefile.rules cleanall
 
-clean-libs:
-	@$(MAKE) -f Makefile.rules clean-libs
-	@$(MAKE) -f Makefile.rules cleanall
-
-cleanall-libs:
-	@$(MAKE) -f Makefile.rules cleanall-libs
 clean-libs:
 	@$(MAKE) -f Makefile.rules clean-libs
 
