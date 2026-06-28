@@ -36,6 +36,31 @@ endif
 #==============================================================================
 ifneq ($(_INCLUDED_AS_CONFIG),)
 
+EXEC_NAME := app
+LIB_NAME := mylib
+
+SRC_DIR        ?= src
+EXTRA_SRCS_CXX ?=
+EXTRA_SRCS_C   ?=
+EXCLUDE_SRCS   ?=
+
+INCLUDE_DIRS +=
+LIBS_PATH    +=
+DEFINES      +=
+
+# Compilation flags
+ifndef MSVC
+    LDFLAGS  += -flto
+    LDLIBS   +=
+    DEBUG_FLAGS   += -g -ggdb -O0
+    RELEASE_FLAGS += -march=native -Ofast -flto
+    WFLAGS   += -Weffc++ -Wpadded
+    CXXFLAGS += -std=c++20 -fno-rtti -fno-exceptions
+else
+    WFLAGS += /wd5026 /wd5027 /wd4626 /wd4625 /wd4668 /wd4820
+    CXXFLAGS += /std:c++20 /EHsc
+endif
+
 # Compilation flags
 ifeq ($(TARGET),WEB)
     EXEC_EXTENSION := .html
@@ -84,7 +109,7 @@ ifdef MSVC
     RELEASE_FLAGS += 
     WFLAGS   += 
     CPPFLAGS += 
-    CXXFLAGS += /std:c++latest
+    CXXFLAGS +=
     CFLAGS   += 
 else
     LDLIBS   += 
@@ -94,44 +119,20 @@ else
     WFLAGS   += 
     CPPFLAGS += 
     CXXFLAGS += 
-    CFLAGS   += 
-    LDLIBS   += 
-    LDFLAGS  += 
-    DEBUG_FLAGS   += -g -ggdb -O0
-    RELEASE_FLAGS += -march=native -Ofast -s -DNDEBUG
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
+    CFLAGS   +=
 endif
 endif
 ifeq ($(TARGET),LINUX)
-    LDLIBS   += 
-    LDFLAGS  += 
+    LDLIBS   +=
+    LDFLAGS  +=
     DEBUG_FLAGS   += -g -ggdb -O0
     RELEASE_FLAGS += -march=native -Ofast -s -DNDEBUG
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
-    LDLIBS   += 
-    LDFLAGS  += 
-    DEBUG_FLAGS   += -g -ggdb -O0
-    RELEASE_FLAGS += -march=native -Ofast -s -DNDEBUG
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
+    WFLAGS   +=
+    CPPFLAGS +=
+    CXXFLAGS += -std=c++20
+    CFLAGS   +=
 endif
 ifeq ($(TARGET),OSX)
-    LDLIBS   += 
-    LDFLAGS  += 
-    DEBUG_FLAGS   += 
-    RELEASE_FLAGS += 
-    WFLAGS   += 
-    CPPFLAGS += 
-    CXXFLAGS += 
-    CFLAGS   += 
     LDLIBS   += 
     LDFLAGS  += 
     DEBUG_FLAGS   += 
