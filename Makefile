@@ -18,6 +18,7 @@ _INCLUDED_AS_CONFIG := $(filter $(_LAST_MK),$(firstword $(MAKEFILE_LIST)))
 # When invoked directly, load the generic build infrastructure
 ifneq ($(_INCLUDED_AS_CONFIG),)
 include Makefile.vars
+endif
 #TODO HANDLE CPP AND C STANDARD SEPARATLY AND THEM MERGE ON CFLAGS AN CXXFLAGSendif
 
 EXEC_NAME := app
